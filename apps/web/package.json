@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.3",
-    "@codefi/delegator-core-viem": "^0.3.1",
+    "@codefi/delegator-core-viem": "^0.4.0",
     "@daimo/pay": "^0.3.5",
     "@hookform/resolvers": "^3.9.0",
     "@paralleldrive/cuid2": "^2.2.2",

@@ -34,7 +34,7 @@ export function DaimoDepositDrawer({ children }: DaimoDepositDrawerProps) {
   const [amount, setAmount] = useState<string>("");
   const [payment, setPayment] = useState<DaimoResponse | null>(null);
   const [onFocus, setOnFocus] = useState(false);
-  const { delegatorClient } = useDelegator();
+  const { delegatorAccount } = useDelegator();
   const { toast } = useToast();
   const { mutateAsync: generatePayment } =
     api.daimo.generatePayment.useMutation();
@@ -42,7 +42,7 @@ export function DaimoDepositDrawer({ children }: DaimoDepositDrawerProps) {
   const debouncedGeneratePaymentId = useRef(
     debounce(async (amount: number) => {
       try {
-        if (!delegatorClient) {
+        if (!delegatorAccount) {
           throw new Error("No delegator client found");
         }
         const payment = await generatePayment({
@@ -62,7 +62,7 @@ export function DaimoDepositDrawer({ children }: DaimoDepositDrawerProps) {
     }, 1000),
   ).current;
 
-  if (!delegatorClient) {
+  if (!delegatorAccount) {
     return null;
   }
 

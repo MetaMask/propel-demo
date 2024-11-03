@@ -4,7 +4,7 @@ import {
   LOCATION_MAX_LENGTH,
   PROPOSAL_NAME_MAX_LENGTH,
 } from "@/lib/constants";
-import { generateProposalId, getBundlerClient } from "@/lib/delegator";
+import { generateProposalId, getPimlicoClient } from "@/lib/delegator";
 import { getProposalNFTs } from "@/lib/proposalNFT";
 import { Status, type EventStatus } from "@/lib/types";
 import { directionFilterSchema, queryFilterSchema } from "@/lib/validators";
@@ -96,10 +96,10 @@ export const eventRouter = createTRPCRouter({
         throw new Error("Invalid event ID");
       }
 
-      const bundler = getBundlerClient();
+      const pimlicoClient = getPimlicoClient();
       for (let i = 0; i < 3; i++) {
         try {
-          const receipt = await bundler.waitForUserOperationReceipt({
+          const receipt = await pimlicoClient.waitForUserOperationReceipt({
             hash: input.hash,
             timeout: 60_000,
           });
@@ -125,7 +125,7 @@ export const eventRouter = createTRPCRouter({
         } catch (err) {
           if (err instanceof Error) {
           }
-          const status = await bundler.getUserOperationStatus({
+          const status = await pimlicoClient.getUserOperationStatus({
             hash: input.hash,
           });
           switch (status.status) {

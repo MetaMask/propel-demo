@@ -3,22 +3,21 @@ import { getDelegatorUSDCBalance } from "@/lib/delegator";
 import { useDelegator } from "@/providers/delegator";
 
 export function useWallet() {
-  const { delegatorClient } = useDelegator();
+  const { delegatorAccount } = useDelegator();
   return useQuery({
-    queryKey: ["wallet", delegatorClient?.account.address],
+    queryKey: ["wallet", delegatorAccount?.address],
     queryFn: async () => {
-      if (!delegatorClient) {
+      if (!delegatorAccount) {
         return undefined;
       }
-      const balance = await getDelegatorUSDCBalance(delegatorClient);
+      const balance = await getDelegatorUSDCBalance(delegatorAccount);
       const balanceInUsdc = Number(balance / 1000000n);
-
       return {
         balance: balanceInUsdc,
-        address: delegatorClient.account.address,
-        client: delegatorClient,
+        address: delegatorAccount.address,
+        account: delegatorAccount,
       };
     },
-    enabled: !!delegatorClient,
+    enabled: !!delegatorAccount,
   });
 }
