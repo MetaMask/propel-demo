@@ -42,8 +42,8 @@
       "dependsOn": ["^seed"],
       "cache": false
     },
-    "@popup-city/web#seed": {
-      "dependsOn": ["db:push", "@popup-city/contracts#seed", "^seed"],
+    "@propel-demo/web#seed": {
+      "dependsOn": ["db:push", "@propel-demo/contracts#seed", "^seed"],
       "cache": false
     }
   },

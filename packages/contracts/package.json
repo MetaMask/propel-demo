@@ -1,7 +1,7 @@
 {
-  "name": "@popup-city/contracts",
+  "name": "@propel-demo/contracts",
   "version": "0.1.0",
-  "description": "Popup City Contracts",
+  "description": "Propel Demo Contracts",
   "scripts": {
     "chain:start": "docker compose --env-file ./../../.env up -d",
     "chain:stop": "docker compose --env-file ./../../.env down",

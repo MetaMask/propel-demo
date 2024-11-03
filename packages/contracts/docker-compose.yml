@@ -1,4 +1,4 @@
-name: popup-city-contracts
+name: propel-demo-contracts
 services:
   anvil:
     image: ghcr.io/foundry-rs/foundry:nightly-fa0e0c2ca3ae75895dd19173a02faf88509c0608

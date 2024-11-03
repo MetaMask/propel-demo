@@ -129,7 +129,9 @@ const deployedLiveContracts = {
         },
       ],
       inheritedFunctions: {
+        afterAllHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
         afterHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
+        beforeAllHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
         beforeHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
       },
     },
@@ -996,7 +998,9 @@ const deployedLiveContracts = {
         },
       ],
       inheritedFunctions: {
+        afterAllHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
         afterHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
+        beforeAllHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
         beforeHook: "@delegation-framework/enforcers/CaveatEnforcer.sol",
       },
     },

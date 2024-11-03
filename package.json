@@ -1,5 +1,5 @@
 {
-  "name": "stunt-popup-city",
+  "name": "propel-demo",
   "private": true,
   "scripts": {
     "build": "turbo build",
