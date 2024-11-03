@@ -1,0 +1,29 @@
+{
+  "name": "stunt-popup-city",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "chain:start": "docker compose -f packages/contracts/docker-compose.yml --env-file ./.env up -d",
+    "chain:stop": "docker compose -f packages/contracts/docker-compose.yml --env-file ./.env down",
+    "db:push": "turbo db:push",
+    "db:start": "turbo db:start",
+    "db:migrate": "turbo db:migrate",
+    "db:generate": "turbo db:generate",
+    "db:stop": "turbo db:stop",
+    "db:studio": "turbo db:studio",
+    "dev": "turbo dev",
+    "format": "prettier --write $(git ls-files '*.ts' '*.tsx' '*.md')",
+    "lint": "turbo lint",
+    "seed": "turbo seed"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.2",
+    "turbo": "^2.1.1",
+    "typescript": "^5.5.3"
+  },
+  "packageManager": "bun@1.1.32",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

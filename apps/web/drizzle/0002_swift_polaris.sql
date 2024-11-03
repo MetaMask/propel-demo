@@ -1,0 +1,1 @@
+ALTER TABLE "ec_event" ADD COLUMN "sola_event_id" text;

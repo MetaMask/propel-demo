@@ -1,0 +1,1 @@
+ALTER TABLE "ec_event" ADD COLUMN "ends_at" timestamp;

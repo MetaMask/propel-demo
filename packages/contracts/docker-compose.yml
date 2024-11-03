@@ -1,0 +1,34 @@
+name: popup-city-contracts
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:nightly-fa0e0c2ca3ae75895dd19173a02faf88509c0608
+    ports: ["8545:8545"]
+    entrypoint:
+      [
+        "anvil",
+        "--host",
+        "0.0.0.0",
+        "--fork-url",
+        "https://sepolia.infura.io/v3/${INFURA_API_KEY}",
+        "--chain-id",
+        "31337",
+      ]
+    platform: linux/amd64/v8
+
+  mock-paymaster:
+    image: ghcr.io/pimlicolabs/mock-verifying-paymaster:main
+    ports: ["3300:3000"]
+    environment:
+      - ALTO_RPC=http://alto:4337
+      - ANVIL_RPC=http://anvil:8545
+
+  alto:
+    image: ghcr.io/pimlicolabs/mock-alto-bundler:main
+    ports: ["4337:4337"]
+    environment:
+      - ANVIL_RPC=http://anvil:8545
+      - SKIP_DEPLOYMENTS=true
+
+  otterscan:
+    image: otterscan/otterscan:latest
+    ports: ["5100:80"]

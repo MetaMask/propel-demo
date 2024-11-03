@@ -1,0 +1,1 @@
+ALTER TABLE "ec_pledge" ADD COLUMN "attendee_id" text;
