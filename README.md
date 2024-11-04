@@ -28,7 +28,24 @@ git clone https://github.com/MetaMask/propel-demo.git
 cd propel-demo
 ```
 
-#### 2. Install dependencies
+#### 1.1 Initialize git submodules
+
+```bash
+git submodule update --init --recursive
+```
+
+#### 2. Installing dependencies
+
+#### 2.1 Setup npm token
+
+- Create a file called `.npmrc` in the root of the project and add the following:
+
+```
+@codefi:registry=https://nexus.eu-west-3.codefi.network/repository/npm-hosted/
+//nexus.eu-west-3.codefi.network/repository/npm-hosted/:_authToken=<YOUR-NPM-TOKEN>
+```
+
+#### 2.2 Install dependencies
 
 ```bash
 bun install
@@ -87,7 +104,7 @@ bun db:start
 bun db:migrate
 ```
 
-#### 5. Start local chain, bundler and mock paymaster
+#### 5. Start local chain, bundler and mock paymaster. (It takes a while to start on docker)
 
 ```bash
 bun chain:start
@@ -96,7 +113,7 @@ bun chain:start
 > [!TIP]
 > Otterscan (local block explorer) is available at http://localhost:5100
 
-#### 6. Deploy contracts and seed database (Make sure that the local chain is running)
+#### 6. Deploy contracts and seed database (If you have any issues with the local chain, make sure that it's up and running)
 
 ```bash
 bun seed

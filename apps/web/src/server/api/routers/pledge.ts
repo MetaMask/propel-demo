@@ -194,6 +194,33 @@ export const pledgeRouter = createTRPCRouter({
       };
     }),
 
+  accepted: privateProcedure
+    .input(z.object({ eventId: z.string().cuid2() }))
+    .query(async ({ ctx, input }) => {
+      const ev = await ctx.db.query.events.findFirst({
+        where: and(
+          eq(events.id, input.eventId),
+          eq(events.userId, ctx.user.id),
+        ),
+      });
+
+      if (!ev) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Event not found or not active",
+        });
+      }
+
+      const acceptedPledges = await ctx.db.query.pledges.findMany({
+        where: and(
+          eq(pledges.eventId, input.eventId),
+          eq(pledges.accepted, true),
+        ),
+      });
+
+      return acceptedPledges;
+    }),
+
   createCovered: privateProcedure
     .input(
       z.object({

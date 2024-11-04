@@ -305,8 +305,8 @@ export async function EventDetailAttendeesCard({ event }: { event: Event }) {
     return null;
   }
 
-  const data = await api.pledge.valid({ eventId: event.id });
-  const plegerUserIds = data.pledges.map((p) => p.attendeeId ?? p.userId);
+  const data = await api.pledge.accepted({ eventId: event.id });
+  const plegerUserIds = data.map((p) => p.attendeeId ?? p.userId);
   const pledgers = await api.clerk.map({ ids: plegerUserIds });
   const pledgersEmails = Array.from(pledgers.values()).map((p) => p.email);
 
@@ -316,7 +316,7 @@ export async function EventDetailAttendeesCard({ event }: { event: Event }) {
         <CardTitle>Attendees</CardTitle>
       </CardHeader>
       <CardContent>
-        {data.pledges.map((p) => (
+        {data.map((p) => (
           <div key={p.id} className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <Avatar className="mr-1 h-4 w-4">
