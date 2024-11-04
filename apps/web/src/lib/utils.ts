@@ -9,6 +9,8 @@ import {
   type Pledge,
   type QRCodeTicketData,
 } from "./types";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { pledges } from "@/server/db/schema";
 export { parse, stringify } from "superjson";
 
 export function cn(...inputs: ClassValue[]) {
@@ -121,4 +123,32 @@ export const createMapsLink = (location: string) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     location,
   )}`;
+};
+
+export const userPledgesFilter = ({
+  userId,
+  eventId,
+  pledgeId,
+  accepted,
+}: {
+  userId: string;
+  eventId?: string;
+  pledgeId?: string;
+  accepted?: boolean;
+}) => {
+  const eqFilters = [];
+  if (pledgeId) {
+    eqFilters.push(eq(pledges.id, pledgeId));
+  }
+  if (eventId) {
+    eqFilters.push(eq(pledges.eventId, eventId));
+  }
+  if (accepted) {
+    eqFilters.push(eq(pledges.accepted, accepted));
+  }
+
+  return or(
+    and(...eqFilters, eq(pledges.attendeeId, userId)),
+    and(...eqFilters, isNull(pledges.attendeeId), eq(pledges.userId, userId)),
+  );
 };

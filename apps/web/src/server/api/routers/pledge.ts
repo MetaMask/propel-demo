@@ -1,4 +1,5 @@
 import { getUSDCBalance } from "@/lib/delegator";
+import { userPledgesFilter } from "@/lib/utils";
 import { delegationSchema } from "@/lib/validators";
 import {
   createCallerFactory,
@@ -9,7 +10,7 @@ import {
 import { coverMe, events, pledges } from "@/server/db/schema";
 import { clerkClient } from "@clerk/nextjs/server";
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 export const pledgeRouter = createTRPCRouter({
@@ -18,24 +19,16 @@ export const pledgeRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       if (input.eventId) {
         return await ctx.db.query.pledges.findMany({
-          where: or(
-            and(
-              eq(pledges.attendeeId, ctx.user.id),
-              eq(pledges.eventId, input.eventId),
-            ),
-            and(
-              isNull(pledges.attendeeId),
-              eq(pledges.userId, ctx.user.id),
-              eq(pledges.eventId, input.eventId),
-            ),
-          ),
+          where: userPledgesFilter({
+            userId: ctx.user.id,
+            eventId: input.eventId,
+          }),
         });
       } else {
         return await ctx.db.query.pledges.findMany({
-          where: or(
-            and(eq(pledges.attendeeId, ctx.user.id)),
-            and(isNull(pledges.attendeeId), eq(pledges.userId, ctx.user.id)),
-          ),
+          where: userPledgesFilter({
+            userId: ctx.user.id,
+          }),
         });
       }
     }),
@@ -98,17 +91,10 @@ export const pledgeRouter = createTRPCRouter({
     .input(z.object({ pledgeId: z.string().cuid2() }))
     .mutation(async ({ ctx, input }) => {
       const p = await ctx.db.query.pledges.findFirst({
-        where: or(
-          and(
-            eq(pledges.attendeeId, ctx.user.id),
-            eq(pledges.id, input.pledgeId),
-          ),
-          and(
-            isNull(pledges.attendeeId),
-            eq(pledges.userId, ctx.user.id),
-            eq(pledges.id, input.pledgeId),
-          ),
-        ),
+        where: userPledgesFilter({
+          userId: ctx.user.id,
+          pledgeId: input.pledgeId,
+        }),
       });
       if (!p) {
         throw new TRPCError({
@@ -227,17 +213,10 @@ export const pledgeRouter = createTRPCRouter({
       }
       // Check if user has already pledged on this proposal
       const prev = await ctx.db.query.pledges.findFirst({
-        where: or(
-          and(
-            eq(pledges.attendeeId, coverMeRequest.requesterId),
-            eq(pledges.eventId, coverMeRequest.eventId),
-          ),
-          and(
-            isNull(pledges.attendeeId),
-            eq(pledges.userId, coverMeRequest.requesterId),
-            eq(pledges.eventId, coverMeRequest.eventId),
-          ),
-        ),
+        where: userPledgesFilter({
+          userId: coverMeRequest.requesterId,
+          eventId: coverMeRequest.eventId,
+        }),
       });
 
       if (prev) {
