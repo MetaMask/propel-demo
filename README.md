@@ -113,7 +113,7 @@ bun chain:start
 > [!TIP]
 > Otterscan (local block explorer) is available at http://localhost:5100
 
-#### 6. Deploy contracts and seed database (If you got any issues with the local chain, make sure that it's up and running)
+#### 6. Deploy contracts and seed database (If you have any issues with the local chain, make sure that it's up and running)
 
 ```bash
 bun seed
