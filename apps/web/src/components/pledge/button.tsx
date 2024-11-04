@@ -168,7 +168,7 @@ function PledgeForm({ event, creator }: { event: Event; creator: PublicUser }) {
   });
   const router = useRouter();
   const { toast } = useToast();
-  const { delegatorClient } = useDelegator();
+  const { delegatorAccount } = useDelegator();
   const { data: wallet } = useWallet();
   const { mutateAsync: createPledge, isPending } =
     api.pledge.create.useMutation();
@@ -196,7 +196,7 @@ function PledgeForm({ event, creator }: { event: Event; creator: PublicUser }) {
       });
     }
 
-    if (!delegatorClient) {
+    if (!delegatorAccount) {
       return toast({
         title: "Error",
         description: "Wallet not found. Please, refresh the page.",
@@ -205,7 +205,7 @@ function PledgeForm({ event, creator }: { event: Event; creator: PublicUser }) {
     }
 
     const signedDelegation = await createPledgeDelegation({
-      client: delegatorClient,
+      delegatorAccount,
       proposalCreatorAddress: creator.walletAddress!,
       attendeeAddress: wallet.address,
       proposalAddress: event.proposalAddress,

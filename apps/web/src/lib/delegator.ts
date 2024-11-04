@@ -1,15 +1,17 @@
 import { CHAIN, DELEGATOR_SALT, USDC_ADDRESS } from "@/lib/constants";
 import {
-  type DeleGatorClient,
   type CaveatStruct,
   type DeleGatorEnvironment,
   createCaveatBuilder,
-  createDeleGatorClient,
   getDeleGatorEnvironment,
   Implementation,
-  type Redemption,
   SINGLE_DEFAULT_MODE,
   createRootDelegation,
+  type MetaMaskSmartAccount,
+  DelegationFramework,
+  type ExecutionMode,
+  toMetaMaskSmartAccount,
+  type ExecutionStruct,
 } from "@codefi/delegator-core-viem";
 import {
   type Address,
@@ -38,12 +40,13 @@ import {
 import type { RouterInputs, RouterOutputs } from "@/trpc/react";
 import type { IProvider } from "@web3auth/base";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
-import {
-  pimlicoBundlerActions,
-  pimlicoPaymasterActions,
-} from "permissionless/actions/pimlico";
+import { pimlicoBundlerActions } from "permissionless/actions/pimlico";
 import { hardhat, sepolia } from "viem/chains";
 import type { Event, Pledge } from "@/lib/types";
+import {
+  createBundlerClient,
+  createPaymasterClient,
+} from "viem/account-abstraction";
 
 export const getDelegatorEnv = (chainId: number) => {
   return getDeleGatorEnvironment(
@@ -52,24 +55,31 @@ export const getDelegatorEnv = (chainId: number) => {
   );
 };
 
-export const getBundlerClient = () => {
-  const bundler = createClient({
+export const getPimlicoClient = () => {
+  return createClient({
     transport: http(env.NEXT_PUBLIC_BUNDLER_URL),
     chain: CHAIN,
   })
     .extend(bundlerActions(ENTRYPOINT_ADDRESS_V07))
     .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V07));
-
-  return bundler;
 };
 
-const getPaymasterClient = () => {
-  const paymaster = createClient({
-    transport: http(env.NEXT_PUBLIC_PAYMASTER_URL),
-    chain: CHAIN,
-  }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V07));
+export const getBundlerClientAndGasPrice = async () => {
+  const pimlicoClient = getPimlicoClient();
 
-  return paymaster;
+  const { fast: feesPerGas } = await pimlicoClient.getUserOperationGasPrice();
+
+  const paymaster = createPaymasterClient({
+    transport: http(env.NEXT_PUBLIC_PAYMASTER_URL),
+  });
+
+  const bundlerClient = createBundlerClient({
+    transport: http(env.NEXT_PUBLIC_BUNDLER_URL),
+    chain: CHAIN,
+    paymaster,
+  });
+
+  return { bundlerClient, feesPerGas };
 };
 
 export const generateProposalId = (
@@ -132,19 +142,19 @@ function erc20TransferAmountBuilder(
 }
 
 export async function createPledgeDelegation({
-  client,
+  delegatorAccount,
   proposalCreatorAddress,
   attendeeAddress,
   proposalAddress,
   pledgeAmount,
 }: {
-  client: DeleGatorClient;
+  delegatorAccount: MetaMaskSmartAccount<Implementation>;
   proposalCreatorAddress: Address;
   attendeeAddress: Address;
   proposalAddress: Hex;
   pledgeAmount: number;
 }) {
-  const caveatBuilder = createCaveatBuilder(client.account.environment)
+  const caveatBuilder = createCaveatBuilder(delegatorAccount.environment)
     .extend("proposalId", proposalIdBuilder)
     // we add this custom builder as a workaround for this bug https://github.com/MetaMask/delegator-sdk/issues/495
     .extend("erc20TransferAmount-495", erc20TransferAmountBuilder);
@@ -161,11 +171,14 @@ export async function createPledgeDelegation({
 
   const delegation = createRootDelegation(
     proposalCreatorAddress,
-    client.account.address,
+    delegatorAccount.address,
     caveatBuilder,
   );
 
-  const signedDelegation = await client.signDelegation(delegation);
+  const signedDelegation = {
+    ...delegation,
+    signature: await delegatorAccount.signDelegation({ delegation }),
+  };
 
   return signedDelegation;
 }
@@ -175,12 +188,12 @@ type AwaitUserOpOutputs = RouterOutputs["event"]["fulfill"];
 type AwaitUserOpFn = (inputs: AwaitUserOpInputs) => Promise<AwaitUserOpOutputs>;
 
 export async function closeBids({
-  creatorGatorClient,
+  creatorAccount,
   event,
   pledges,
   awaitUserOpFn,
 }: {
-  creatorGatorClient: DeleGatorClient;
+  creatorAccount: MetaMaskSmartAccount<Implementation>;
   event: Event;
   pledges: Pledge[];
   awaitUserOpFn: AwaitUserOpFn;
@@ -189,66 +202,58 @@ export async function closeBids({
     (p) => p.attendeeAddress ?? p.delegation.delegator,
   );
 
-  const redemptions: Redemption[] = [];
-
   const targetFunding = event.pledgePrice * event.minTickets;
-
-  // Create ProposalNFT execution
-  const createProposalCalldata = encodeFunctionData({
-    abi: [
-      {
-        inputs: [
-          { name: "_minimumFunding", type: "uint256" },
-          { name: "_biddingToken", type: "address" },
-          { name: "_nonce", type: "uint256" },
-        ],
-        name: "createProposal",
-        outputs: [{ name: "", type: "bytes32" }],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-    ],
-    functionName: "createProposal",
-    args: [
-      BigInt(targetFunding) * 1000000n,
-      getUSDCAddress(CHAIN.id),
-      event.nonce,
-    ],
-  });
 
   const createProposalExecution = {
     target: PROPOSAL_NFT_ADDRESS as Address,
-    callData: createProposalCalldata,
+    callData: encodeFunctionData({
+      abi: [
+        {
+          inputs: [
+            { name: "_minimumFunding", type: "uint256" },
+            { name: "_biddingToken", type: "address" },
+            { name: "_nonce", type: "uint256" },
+          ],
+          name: "createProposal",
+          outputs: [{ name: "", type: "bytes32" }],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      functionName: "createProposal",
+      args: [
+        BigInt(targetFunding) * 1000000n,
+        getUSDCAddress(CHAIN.id),
+        event.nonce,
+      ],
+    }),
     value: 0n,
   };
-
-  // Close bids execution
-  const closeBidsCalldata = encodeFunctionData({
-    abi: [
-      {
-        inputs: [
-          { name: "proposalId", type: "bytes32" },
-          { name: "bidders", type: "address[]" },
-        ],
-        name: "closeBids",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function",
-      },
-    ],
-    functionName: "closeBids",
-    args: [event.proposalAddress, pledgers],
-  });
 
   const closeBidsExecution = {
     target: PROPOSAL_NFT_ADDRESS as Address,
-    callData: closeBidsCalldata,
+    callData: encodeFunctionData({
+      abi: [
+        {
+          inputs: [
+            { name: "proposalId", type: "bytes32" },
+            { name: "bidders", type: "address[]" },
+          ],
+          name: "closeBids",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      functionName: "closeBids",
+      args: [event.proposalAddress, pledgers],
+    }),
     value: 0n,
   };
 
-  const withdrawRedemptions: Redemption[] = [];
-
-  for (const pledge of pledges) {
+  const delegationArrays = pledges.map((p) => [p.delegation]);
+  const modes: ExecutionMode[] = pledges.map((_) => SINGLE_DEFAULT_MODE);
+  const executions: ExecutionStruct[][] = pledges.map((p) => {
     const withdrawCalldata = encodeFunctionData({
       abi: [
         {
@@ -263,89 +268,57 @@ export async function closeBids({
         },
       ],
       functionName: "transfer",
-      args: [
-        creatorGatorClient.account.address,
-        BigInt(pledge.amount) * 1000000n,
-      ],
+      args: [creatorAccount.address, BigInt(p.amount) * 1000000n],
     });
 
-    withdrawRedemptions.push({
-      permissionContext: [pledge.delegation],
-      executions: [
-        {
-          target: USDC_ADDRESS,
-          callData: withdrawCalldata,
-          value: 0n,
-        },
-      ],
-      mode: SINGLE_DEFAULT_MODE,
-    });
-  }
-
-  redemptions.push({
-    permissionContext: [],
-    executions: [createProposalExecution],
-    mode: SINGLE_DEFAULT_MODE,
+    return [
+      {
+        target: USDC_ADDRESS,
+        callData: withdrawCalldata,
+        value: 0n,
+      },
+    ];
   });
 
-  redemptions.push({
-    permissionContext: [],
-    executions: [closeBidsExecution],
-    mode: SINGLE_DEFAULT_MODE,
+  const redeemDelegationsCalldata =
+    DelegationFramework.encode.redeemDelegations(
+      [...delegationArrays, [], []],
+      [...modes, SINGLE_DEFAULT_MODE, SINGLE_DEFAULT_MODE],
+      [...executions, [createProposalExecution], [closeBidsExecution]],
+    );
+
+  const { bundlerClient, feesPerGas } = await getBundlerClientAndGasPrice();
+
+  const userOpHash = await bundlerClient.sendUserOperation({
+    account: creatorAccount,
+    calls: [
+      {
+        to: creatorAccount.address,
+        data: redeemDelegationsCalldata,
+      },
+    ],
+    ...feesPerGas,
   });
-
-  redemptions.push(...withdrawRedemptions);
-
-  const bundler = getBundlerClient();
-  const { fast } = await bundler.getUserOperationGasPrice();
-
-  const userOp = await creatorGatorClient.createRedeemDelegationsUserOp(
-    redemptions,
-    fast,
-  );
-
-  const paymaster = getPaymasterClient();
-
-  console.log("Estimating useroperation gas...");
-
-  const gasEstimate = await bundler.estimateUserOperationGas({
-    userOperation: userOp,
-  });
-  console.log("Gas estimate:", gasEstimate);
-
-  const sponsorship = await paymaster.sponsorUserOperation({
-    userOperation: userOp,
-  });
-
-  const signedUserOperation = await creatorGatorClient.signUserOp({
-    ...userOp,
-    ...sponsorship,
-  });
-
-  const userOpHash = await bundler.sendUserOperation({
-    userOperation: signedUserOperation,
-  });
-
-  console.log("UserOp hash:", userOpHash);
 
   const receipt = await awaitUserOpFn({
     id: event.id,
     pledges: pledges.map((p) => p.id),
     hash: userOpHash,
   });
+
   console.log("UserOp receipt:", receipt);
 
   return receipt;
 }
 
 export const getDelegatorUSDCBalance = async (
-  client: DeleGatorClient | null,
+  account?: MetaMaskSmartAccount<Implementation>,
 ) => {
-  if (!client) {
-    throw new Error("No client provided");
+  if (!account) {
+    throw new Error("No account provided");
   }
 
-  const addr = client.account.address;
+  const addr = account.address;
 
   const publicClient = createPublicClient({
     chain: CHAIN,
@@ -396,9 +369,9 @@ export const getUSDCBalance = async (address: Address) => {
   return bb;
 };
 
-export const getDelegatorClientFromProvider = async (
+export const getMetaMaskSmartAccountFromProvider = async (
   provider: IProvider,
-): Promise<DeleGatorClient> => {
+): Promise<MetaMaskSmartAccount<Implementation>> => {
   const [owner] = (await provider.request({
     method: "eth_accounts",
   })) as Address[];
@@ -418,62 +391,36 @@ export const getDelegatorClientFromProvider = async (
     transport: custom(provider),
   });
 
-  const client = createDeleGatorClient({
-    transport: http(env.NEXT_PUBLIC_CHAIN_URL),
-    chain: CHAIN,
-    account: {
-      implementation: Implementation.Hybrid,
-      deployParams: [owner, [], [], []],
-      isAccountDeployed: false,
-      signatory: walletClient,
-      deploySalt: DELEGATOR_SALT,
-    },
+  const account = await toMetaMaskSmartAccount({
+    client: publicClient,
+    implementation: Implementation.Hybrid,
+    deployParams: [owner, [], [], []],
+    signatory: { walletClient },
+    deploySalt: DELEGATOR_SALT,
     environment: getDelegatorEnv(CHAIN.id),
   });
 
-  const isGatorDeployed = !!(await publicClient.getCode({
-    address: client.account.address,
-  }));
+  const isGatorDeployed = await account.isDeployed();
 
   console.log("isGatorDeployed:", isGatorDeployed);
 
   if (!isGatorDeployed) {
     console.log("Deploying gator...");
-    const bundler = getBundlerClient();
-    const paymaster = getPaymasterClient();
+    const { bundlerClient, feesPerGas } = await getBundlerClientAndGasPrice();
 
-    const { fast } = await bundler.getUserOperationGasPrice();
-
-    const userOp = await client.createExecuteUserOp(
-      {
-        target: zeroAddress,
-        callData: "0x",
-        value: 0n,
-      },
-      fast,
-    );
-
-    console.log("Estimating useroperation gas...");
-
-    const gasEstimate = await bundler.estimateUserOperationGas({
-      userOperation: userOp,
-    });
-    console.log("Gas estimate:", gasEstimate);
-
-    const sponsorship = await paymaster.sponsorUserOperation({
-      userOperation: userOp,
+    const userOpHash = await bundlerClient.sendUserOperation({
+      account,
+      calls: [
+        {
+          to: zeroAddress,
+          data: "0x",
+          value: 0n,
+        },
+      ],
+      ...feesPerGas,
     });
 
-    const signedUserOperation = await client.signUserOp({
-      ...userOp,
-      ...sponsorship,
-    });
-
-    const userOpHash = await bundler.sendUserOperation({
-      userOperation: signedUserOperation,
-    });
-
-    const receipt = await bundler.waitForUserOperationReceipt({
+    const receipt = await bundlerClient.waitForUserOperationReceipt({
       hash: userOpHash,
       timeout: 30_000,
     });
@@ -489,20 +436,15 @@ export const getDelegatorClientFromProvider = async (
     console.log("Gator deployed!");
   }
 
-  return client.toDeployedClient();
+  return account;
 };
 
 export const withdrawUSDC = async (
-  client: DeleGatorClient,
+  account: MetaMaskSmartAccount<Implementation>,
   to: Address,
   amount: number,
 ) => {
   const rawAmount = BigInt(amount) * 1000000n;
-
-  const bundler = getBundlerClient();
-  const paymaster = getPaymasterClient();
-
-  const { fast } = await bundler.getUserOperationGasPrice();
 
   const withdrawCalldata = encodeFunctionData({
     abi: [
@@ -521,44 +463,20 @@ export const withdrawUSDC = async (
     args: [to, rawAmount],
   });
 
-  const userOp = await client.createRedeemDelegationsUserOp(
-    [
+  const { bundlerClient, feesPerGas } = await getBundlerClientAndGasPrice();
+
+  const userOpHash = await bundlerClient.sendUserOperation({
+    account,
+    calls: [
       {
-        permissionContext: [],
-        executions: [
-          {
-            target: USDC_ADDRESS,
-            callData: withdrawCalldata,
-            value: 0n,
-          },
-        ],
-        mode: SINGLE_DEFAULT_MODE,
+        to: USDC_ADDRESS,
+        data: withdrawCalldata,
       },
     ],
-    fast,
-  );
-
-  console.log("Estimating useroperation gas...");
-
-  const gasEstimate = await bundler.estimateUserOperationGas({
-    userOperation: userOp,
-  });
-  console.log("Gas estimate:", gasEstimate);
-
-  const sponsorship = await paymaster.sponsorUserOperation({
-    userOperation: userOp,
+    ...feesPerGas,
   });
 
-  const signedUserOperation = await client.signUserOp({
-    ...userOp,
-    ...sponsorship,
-  });
-
-  const userOpHash = await bundler.sendUserOperation({
-    userOperation: signedUserOperation,
-  });
-
-  const receipt = await bundler.waitForUserOperationReceipt({
+  const receipt = await bundlerClient.waitForUserOperationReceipt({
     hash: userOpHash,
     timeout: 30_000,
   });

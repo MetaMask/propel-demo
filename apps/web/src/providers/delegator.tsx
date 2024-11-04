@@ -1,16 +1,19 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { type DeleGatorClient } from "@codefi/delegator-core-viem";
+import {
+  type MetaMaskSmartAccount,
+  type Implementation,
+} from "@codefi/delegator-core-viem";
 import { web3auth } from "@/lib/web3auth";
-import { getDelegatorClientFromProvider } from "@/lib/delegator";
+import { getMetaMaskSmartAccountFromProvider } from "@/lib/delegator";
 import { type IProvider } from "@web3auth/base";
 import { api } from "@/trpc/react";
 import { env } from "@/env";
 import { useAuth, useUser } from "@clerk/nextjs";
 
 interface DelegatorCtx {
-  delegatorClient: DeleGatorClient | null;
+  delegatorAccount?: MetaMaskSmartAccount<Implementation>;
 }
 
 const DelegatorContext = createContext<DelegatorCtx | null>(null);
@@ -28,7 +31,8 @@ const DelegatorProviderInner: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useUser();
   const [initialized, setInitialized] = useState(false);
   const [provider, setProvider] = useState<IProvider | null>(null);
-  const [gatorClient, setGatorClient] = useState<DeleGatorClient | null>(null);
+  const [delegatorAccount, setDelegatorAccount] =
+    useState<MetaMaskSmartAccount<Implementation>>();
   const { mutateAsync: setUserWalletAddress } =
     api.clerk.updateWalletAddress.useMutation();
 
@@ -83,21 +87,22 @@ const DelegatorProviderInner: React.FC<{ children: React.ReactNode }> = ({
     connectWeb3auth().catch(console.error);
   }, [getToken, initialized, userEmail]);
 
-  // This useEffect initializes the delegator client once Web3Auth is connected
+  // This useEffect initializes the delegator account once Web3Auth is connected
   // and we have a valid provider.
   useEffect(() => {
     if (!provider) {
-      setGatorClient(null);
+      setDelegatorAccount(undefined);
       return;
     }
     const initDelegator = async () => {
-      console.log("Initializing delegator client...");
+      console.log("Initializing delegator account...");
       try {
-        const delegatorClient = await getDelegatorClientFromProvider(provider);
-        console.log("Delegator client initialized!");
-        setGatorClient(delegatorClient);
+        const delegatorAccount =
+          await getMetaMaskSmartAccountFromProvider(provider);
+        console.log("Delegator account initialized!");
+        setDelegatorAccount(delegatorAccount);
         await setUserWalletAddress({
-          walletAddress: delegatorClient.account.address,
+          walletAddress: delegatorAccount.address,
         });
       } catch (error) {
         console.error("Failed to initialize gator:", error);
@@ -107,7 +112,7 @@ const DelegatorProviderInner: React.FC<{ children: React.ReactNode }> = ({
   }, [provider, setUserWalletAddress]);
 
   return (
-    <DelegatorContext.Provider value={{ delegatorClient: gatorClient }}>
+    <DelegatorContext.Provider value={{ delegatorAccount }}>
       {children}
     </DelegatorContext.Provider>
   );

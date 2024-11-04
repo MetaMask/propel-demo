@@ -48,11 +48,11 @@ function WithdrawFundsForm() {
   const handleWithdraw = async (address: Address) => {
     console.log(`Withdrawing funds to ${address}`);
     if (!wallet) {
-      console.error("No delegator client found");
+      console.error("No delegator account found");
       return;
     }
     console.log("Withdrawing", wallet.balance);
-    await withdrawUSDC(wallet.client, address, wallet.balance);
+    await withdrawUSDC(wallet.account, address, wallet.balance);
     console.log("Withdrawal complete");
   };
 

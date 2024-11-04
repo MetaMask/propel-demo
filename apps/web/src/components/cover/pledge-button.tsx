@@ -30,7 +30,7 @@ export function CoverPledgeButton({
   requester,
 }: Props) {
   const { toast } = useToast();
-  const { delegatorClient } = useDelegator();
+  const { delegatorAccount } = useDelegator();
   const router = useRouter();
   const { data: wallet } = useWallet();
 
@@ -80,8 +80,12 @@ export function CoverPledgeButton({
       return;
     }
 
+    if (!delegatorAccount) {
+      throw new Error("No delegator account found");
+    }
+
     const delegation = await createPledgeDelegation({
-      client: delegatorClient!,
+      delegatorAccount,
       pledgeAmount: event.pledgePrice,
       proposalCreatorAddress: eventCreator.walletAddress!,
       attendeeAddress: coverMeRequest.requesterAddress,
@@ -105,7 +109,7 @@ export function CoverPledgeButton({
     >
       <Button
         disabled={
-          !delegatorClient || isPending || event.status !== Status.ACTIVE
+          !delegatorAccount || isPending || event.status !== Status.ACTIVE
         }
         className="w-full"
       >

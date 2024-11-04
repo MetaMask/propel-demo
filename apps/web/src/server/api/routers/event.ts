@@ -4,9 +4,10 @@ import {
   LOCATION_MAX_LENGTH,
   PROPOSAL_NAME_MAX_LENGTH,
 } from "@/lib/constants";
-import { generateProposalId, getBundlerClient } from "@/lib/delegator";
+import { generateProposalId, getPimlicoClient } from "@/lib/delegator";
 import { getProposalNFTs } from "@/lib/proposalNFT";
 import { Status, type EventStatus } from "@/lib/types";
+import { userPledgesFilter } from "@/lib/utils";
 import { directionFilterSchema, queryFilterSchema } from "@/lib/validators";
 import {
   createTRPCRouter,
@@ -17,7 +18,7 @@ import { events, pledges } from "@/server/db/schema";
 import { clerkClient } from "@clerk/nextjs/server";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 export const eventRouter = createTRPCRouter({
@@ -96,10 +97,10 @@ export const eventRouter = createTRPCRouter({
         throw new Error("Invalid event ID");
       }
 
-      const bundler = getBundlerClient();
+      const pimlicoClient = getPimlicoClient();
       for (let i = 0; i < 3; i++) {
         try {
-          const receipt = await bundler.waitForUserOperationReceipt({
+          const receipt = await pimlicoClient.waitForUserOperationReceipt({
             hash: input.hash,
             timeout: 60_000,
           });
@@ -125,7 +126,7 @@ export const eventRouter = createTRPCRouter({
         } catch (err) {
           if (err instanceof Error) {
           }
-          const status = await bundler.getUserOperationStatus({
+          const status = await pimlicoClient.getUserOperationStatus({
             hash: input.hash,
           });
           switch (status.status) {
@@ -213,26 +214,19 @@ export const eventRouter = createTRPCRouter({
           return res.filter((event) => event.userId === ctx.user.id);
         case "attending":
           const acceptedPledges = await ctx.db.query.pledges.findMany({
-            where: and(
-              eq(pledges.accepted, true),
-              or(
-                and(eq(pledges.attendeeId, ctx.user.id)),
-                and(
-                  isNull(pledges.attendeeId),
-                  eq(pledges.userId, ctx.user.id),
-                ),
-              ),
-            ),
+            where: userPledgesFilter({
+              userId: ctx.user.id,
+              accepted: true,
+            }),
           });
           return res.filter((event) =>
             acceptedPledges.some((p) => p.eventId === event.id),
           );
         case "pledged":
           const userPledges = await ctx.db.query.pledges.findMany({
-            where: or(
-              and(eq(pledges.attendeeId, ctx.user.id)),
-              and(isNull(pledges.attendeeId), eq(pledges.userId, ctx.user.id)),
-            ),
+            where: userPledgesFilter({
+              userId: ctx.user.id,
+            }),
           });
           const userPledgedEvents = userPledges.map((p) => p.eventId);
           return res.filter((event) => userPledgedEvents.includes(event.id));

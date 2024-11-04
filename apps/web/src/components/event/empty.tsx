@@ -44,7 +44,6 @@ export const EmptyCreatedEvents = async () => {
 };
 
 export const EmptyExploreEvents = async () => {
-  const imageUpload = false as boolean;
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-lg py-8 text-center">
       <CalendarPlusIcon className="h-12 w-12 text-black" />
@@ -52,9 +51,7 @@ export const EmptyExploreEvents = async () => {
       <p className="text-sm text-gray-500">
         Bring your idea to life with an event.
       </p>
-      <CreateEventButton imageUpload={imageUpload}>
-        Get Started
-      </CreateEventButton>
+      <CreateEventButton imageUpload>Get Started</CreateEventButton>
     </div>
   );
 };

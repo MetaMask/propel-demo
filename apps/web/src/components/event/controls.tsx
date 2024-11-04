@@ -25,7 +25,13 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { EditEventButton } from "./edit";
 
-export function EventControls({ event, imageUpload }: { event: Event, imageUpload: boolean }) {
+export function EventControls({
+  event,
+  imageUpload,
+}: {
+  event: Event;
+  imageUpload: boolean;
+}) {
   const { user } = useUser();
   if (user?.id !== event.userId) {
     return null;
@@ -109,7 +115,7 @@ function ConcludeEventButton({ event }: { event: Event }) {
     event.minTickets.toString(),
   );
   const [isConcluding, setIsConcluding] = useState(false);
-  const { delegatorClient } = useDelegator();
+  const { delegatorAccount } = useDelegator();
   const { mutateAsync: fulfillEvent, isPending: isFulfilling } =
     api.event.fulfill.useMutation();
 
@@ -152,7 +158,7 @@ function ConcludeEventButton({ event }: { event: Event }) {
 
       // Close bids
       await closeBids({
-        creatorGatorClient: delegatorClient!,
+        creatorAccount: delegatorAccount!,
         event,
         pledges: finalPledges,
         awaitUserOpFn: fulfillEvent,
@@ -258,7 +264,7 @@ function ConcludeEventButton({ event }: { event: Event }) {
   );
 
   if (
-    !delegatorClient ||
+    !delegatorAccount ||
     totalPledges < event.minTickets ||
     event.status !== Status.ACTIVE ||
     isValidPledgesLoading ||
