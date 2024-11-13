@@ -6,8 +6,6 @@
 
 This project includes the following packages/apps:
 
-## Apps and Packages
-
 - `@propel-demo/web`: a [Next.js](https://nextjs.org/) app that contains the frontend of the project
 - `@propel-demo/contracts`: a [Hardhat](https://hardhat.org/) project that contains the smart contracts used in the project
 
